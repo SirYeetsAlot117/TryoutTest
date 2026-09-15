@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Esports Tryouts - Round 1</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Tiny bit of page-specific styling for the admin/view-only banner —
+       kept local here rather than added to styles.css since it's just
+       two color states. -->
+  <style>
+    .admin-banner {
+      max-width: 1080px;
+      margin: 0 auto 40px;
+      padding: 12px 24px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: 1px solid var(--panel-border);
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    }
+    .admin-banner.admin-yes {
+      background: rgba(242, 183, 5, 0.1);
+      color: var(--accent-gold);
+      border-color: var(--accent-gold);
+    }
+    .admin-banner.admin-no {
+      background: var(--loser-bg);
+      color: var(--loser);
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient background effect: a small pixel-grid fire simulation
+       (the classic "Doom fire" technique) drawn at low native resolution
+       and scaled up with image-rendering: pixelated, which is what gives
+       it the chunky/blocky look rather than a smooth gradient. Purely
+       decorative — aria-hidden, pointer-events: none in CSS, and sits at
+       a negative z-index so it never sits above or intercepts clicks on
+       any real content. See fire.js for the simulation and round1.css
+       for its positioning/pixelation rules. -->
+  <canvas id="fireCanvas" aria-hidden="true"></canvas>
+
+  <header class="tournament-header">
+    <h1><span class="divider">·</span> Single Elimination <span class="divider">-</span> Round 1 <span class="divider">·</span></h1>
+  </header>
+
+  <hr class="section-divider" />
+
+  <!-- Filled in by round1.js on load: tells whoever opened this page
+       whether THEY can edit it (i.e. whether this URL had a valid
+       ?key=... admin token) or are just watching. -->
+  <p id="adminBanner" class="admin-banner admin-no">Checking access…</p>
+
+  <!--
+    Layout note: this is now a CSS grid tree, four columns wide, matching
+    the sketch — a top row of four match boxes, a middle row of two
+    semifinal boxes each centered under its feeder pair, and a bottom row
+    with the final box centered under everything. Each match box holds its
+    two player rows stacked on top of each other (instead of side by side
+    with a "vs"), again to match the sketch.
+
+    The bracket connector lines you see between rows aren't drawn here —
+    they're pure decoration computed in round1.js (drawConnectors), because
+    their endpoints depend on the actual on-screen position of each box,
+    which can shift with window size.
+  -->
+  <div class="bracket-scroll">
+    <div class="bracket-tree" id="bracketTree">
+      <svg class="connectors" id="connectorSvg"></svg>
+
+      <!-- Every .slot button now holds two children instead of a bare
+           text node: a small SVG drawing the diagonal corner-accent line
+           (see round1.css's "THE CORNER FIX" for why it's an SVG line
+           rather than a CSS shape), and a .slot-label span that actually
+           holds the player's name. round1.js updates the label span's
+           text, never the button's own textContent, so it never wipes
+           out the SVG. p1 buttons (top row) get the plain line; p2
+           buttons (bottom row) reuse the exact same line coordinates
+           but with the "corner-svg--br" class, which just rotates the
+           whole SVG 180° so the line lands in the bottom-right corner
+           instead of hand-mirroring the coordinates. -->
+
+      <!-- ===================== QUARTERFINALS (row 1) ===================== -->
+      <div class="match" data-match="qf1" style="grid-column: 1; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Nicolas Sieckowski</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Jacob Ferman</span>
+        </button>
+      </div>
+
+      <div class="match" data-match="qf2" style="grid-column: 2; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Ben Sieckowski</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Emmanuel Montero</span>
+        </button>
+      </div>
+
+      <div class="match" data-match="qf3" style="grid-column: 3; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Abraham Louis</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Aleksei Bitkin</span>
+        </button>
+      </div>
+
+      <div class="match" data-match="qf4" style="grid-column: 4; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Mr. Kux</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">tyler Edge</span>
+        </button>
+      </div>
+
+
+      <!-- ===================== SEMIFINALS (row 2) ===================== -->
+      <div class="match match-sf" data-match="sf1" style="grid-column: 1 / span 2; grid-row: 2;">
+        <button class="slot" data-slot="p1" disabled>
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+        <button class="slot" data-slot="p2" disabled>
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+      </div>
+
+      <div class="match match-sf" data-match="sf2" style="grid-column: 3 / span 2; grid-row: 2;">
+        <button class="slot" data-slot="p1" disabled>
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+        <button class="slot" data-slot="p2" disabled>
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+      </div>
+
+      <!-- ===================== FINAL (row 3) ===================== -->
+      <!-- The oval outline from the sketch is the .final-ring wrapper.
+           Inside it, two plain <div> labels — never buttons — since this
+           bracket only produces two finalists, not a champion. -->
+      <div class="final-ring" style="grid-column: 1 / span 4; grid-row: 3;">
+        <div class="match final-match" data-match="final">
+          <div class="finalist" data-slot="p1">TBD</div>
+          <div class="finalist" data-slot="p2">TBD</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toggled by round1.js: starts pointed at "revealed" text/aria state
+       here as a sane no-JS fallback, but the actual starting state
+       (hidden vs revealed) comes from Firebase. round1.js also hides
+       this button entirely for non-admin (no ?key=) visitors. -->
+  <div class="bracket-controls">
+    <button id="bracketToggle" class="toggle-btn" type="button" aria-pressed="false">
+      Reveal Bracket
+    </button>
+  </div>
+
+  <!-- Link to the read-only, auto-updating spectator page. Unlike this
+       page, status.html never needs a ?key — it's always safe to share
+       as "the plain link." -->
+  <p class="status-link" style="max-width: 1080px; margin: 16px auto 0; text-align: center;">
+    <a
+      href="status.html"
+      class="round-nav-btn"
+      style="display: inline-block; text-decoration: none;"
+    >📺 Open Live Status Display</a>
+  </p>
+
+  <h1> </h1>
+  <hr class="section-divider" />
+
+  <!-- Not wired up to anything yet — no click handlers, no page to go
+       to. Purely a placeholder row for the other three brackets that
+       don't exist as pages yet, styled to match everything else on the
+       page. "Round 1" is marked as the current page (aria-current +
+       .is-current) since that's what this file actually is. -->
+  <nav class="round-nav" aria-label="Tournament rounds">
+    <button class="round-nav-btn is-current" type="button" aria-current="page">
+      Single Elimination Round 1
+    </button>
+    <button class="round-nav-btn" type="button" onclick="window.location.href='round2.html'">Single Elimination Round 2</button>
+    <button class="round-nav-btn" type="button" onclick="window.location.href='round3.html'">Single Elimination Round 3</button>
+    <button class="round-nav-btn" type="button">Round Robin</button>
+  </nav>
+
+  <script src="fire.js"></script>
+  <script src="bracketData.js"></script>
+  <!-- type="module" — needed so round1.js can `import` Firebase and
+       firebase-sync.js. Module scripts run after the document has been
+       parsed (like `defer`), so bracketData.js above has already set
+       window.QUARTERFINAL_PLAYERS/FEEDERS by the time this runs. -->
+  <script type="module" src="round1.js"></script>
+</body>
+</html>

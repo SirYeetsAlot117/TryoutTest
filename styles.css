@@ -1,0 +1,536 @@
+/* =========================================================================
+   DESIGN TOKENS
+   ========================================================================= */
+:root {
+  --bg: #12131f;
+  --panel: #1b1d2e;
+  --panel-border: #2b2e42;
+  --text: #eef0f5;
+  --text-muted: #8890a6;
+
+  --accent-gold: #f2b705;
+  --accent-red: #be3939;
+  --loser: #565a6d;
+  --loser-bg: #21222f;
+
+  --line: #3a3e58; /* connector line color */
+
+  --radius: 4px;
+
+  /* ---- EDIT HERE to change the hover sweep animation's speed ----
+     Higher = slower. This is the single value slotSweep's animation
+     duration reads from (see the .slot:hover rule further down). */
+  --hover-sweep-duration: 2.8s;
+
+  /* Shared by .match's clip-path AND the corner accent lines below —
+     keeping it one variable means the card's angled corner and the
+     matching accent on its top/bottom row always stay the same size,
+     so the hover border traces the card's actual edge exactly. Also
+     hardcoded as "14" in each corner-line's x1/y1/x2/y2 in round1.html —
+     SVG geometry attributes aren't reliably stylable via calc()/var() in
+     CSS across browsers, so if this number changes, update the markup
+     to match. */
+  --card-corner-cut: 14px;
+
+  /* ---- EDIT HERE to change how thick the growing hover border gets ----
+     Used by both the straight-edge box-shadow border AND the diagonal
+     corner accent line, so the two always match in thickness. */
+  --hover-border-width: 3px;
+
+  /* ---- EDIT HERE to change the reveal/hide blur strength ---- */
+  --blur-amount: 14px;
+
+  /* ---- EDIT HERE to change the fire's color ----
+     A single fixed color varied only by per-pixel opacity (the
+     simulation's heat value), rather than a multi-hue palette —
+     brighter/hotter cells are just more opaque red over the dark
+     background, dimmer/cooler cells fade toward it. */
+  --fire-color: #be3939;
+
+  /* ---- EDIT HERE to change the fire's overall visibility ----
+     Multiplies on top of the per-pixel heat opacity above, as a single
+     global dial — lower this to make the whole effect fainter without
+     touching the simulation itself. */
+  --fire-opacity: 0.8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* =========================================================================
+   FIRE BACKGROUND
+   fire.js draws the simulation at a small native resolution (a handful
+   of cells across) onto this canvas's actual pixel buffer, then this CSS
+   stretches that tiny buffer up to fill the screen. image-rendering:
+   pixelated is what keeps each simulated cell a crisp, chunky square
+   during that stretch instead of the browser smoothing it into a blur —
+   that's the entire "pixelated" look, there's no per-pixel sizing logic
+   in JS at all.
+   ========================================================================= */
+#fireCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  /* Sits behind every normal-flow element on the page (the header, the
+     bracket, the toggle button) without any of them needing their own
+     z-index — a negative value here is enough on its own. */
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--fire-opacity);
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Full-screen constant motion is exactly the kind of thing this
+   preference exists to turn off — fire.js checks the same query before
+   ever starting its animation loop, this just backstops it in case JS
+   is slow to load or the preference changes mid-session. */
+@media (prefers-reduced-motion: reduce) {
+  #fireCanvas {
+    display: none;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Playfair Display', Georgia, serif;
+  padding: 48px 24px 80px;
+}
+
+/* =========================================================================
+   HEADER
+   ========================================================================= */
+.tournament-header {
+  max-width: 720px;
+  margin: 0 auto 64px;
+  text-align: center;
+}
+
+.tournament-header h1 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 800;
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  letter-spacing: 0.01em;
+  margin: 0 0 8px;
+}
+
+.tournament-header .divider {
+  color: var(--accent-gold);
+}
+
+.tournament-header .sub {
+  color: var(--text-muted);
+  font-size: 1rem;
+  margin: 0;
+}
+
+/* Plain thematic break between the header and the bracket itself —
+   deliberately quiet (no gradient/accent) since the gold and red accents
+   are already doing the attention-grabbing work elsewhere on the page. */
+.section-divider {
+  max-width: 1080px;
+  margin: 0 auto 40px;
+  border: none;
+  border-top: 1px solid var(--panel-border);
+}
+
+/* =========================================================================
+   BRACKET TREE
+   A 4-column grid. Quarterfinals occupy row 1, one per column. Each
+   semifinal spans two of those columns and centers itself in that span,
+   so it visually sits under its own feeder pair. The final spans all
+   four columns and centers itself under the whole tree. `row-gap` is
+   deliberately large — that empty space is where the SVG connector
+   elbows get drawn.
+   ========================================================================= */
+.bracket-scroll {
+  /* On narrow screens the tree keeps its shape and scrolls sideways
+     instead of collapsing into a stack, since collapsing would break the
+     bracket connector geometry. */
+  overflow-x: auto;
+  /* Setting overflow-x here makes the browser treat overflow-y as
+     non-visible too (it can't stay "visible" once overflow-x isn't), so
+     this box clips its own content vertically whether we ask for that
+     or not. filter: blur() on #bracketTree bleeds a soft edge beyond
+     its own box — same as a drop shadow would — and that bleed was
+     getting clipped flat by this container's edge, instead of fading
+     out the way blur is supposed to. The padding-top gives the blur
+     that room; it's sized a bit past the blur radius itself since a
+     Gaussian blur's visible falloff reaches further than the radius
+     value alone. */
+  padding: calc(var(--blur-amount) * 2) 0 8px;
+}
+
+.bracket-tree {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  row-gap: 84px;
+  column-gap: 20px;
+  min-width: 780px;
+  max-width: 1080px;
+  margin: 0 auto;
+  transition: filter 300ms ease;
+}
+
+/* Applied/removed by round1.js's toggle button. Blurs every match card
+   AND the connector lines in one shot, since both live inside this same
+   element — that's "all the brackets" covered by a single filter rather
+   than needing to blur each match individually. Interaction is turned
+   off while blurred (both for the mouse, via pointer-events, and for
+   the keyboard, via the `inert` attribute round1.js sets alongside this
+   class) so nothing can be clicked or focused through the blur. */
+.bracket-tree.blurred {
+  filter: blur(var(--blur-amount));
+  pointer-events: none;
+  user-select: none;
+}
+
+.connectors {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.connectors path {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.match-sf {
+  justify-self: center;
+  width: 80%;
+}
+
+/* =========================================================================
+   MATCH CARD
+   Two rows stacked in one box (rather than side-by-side with a "vs"),
+   split by a single divider line, matching the sketch.
+   ========================================================================= */
+.match {
+  position: relative;
+  z-index: 1; /* sits above the connector lines */
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Angled top-left / bottom-right corners instead of a rounded rect —
+     closer to the diagonal-cut card shapes in Smash Ultimate's results
+     screen than the plain rounded-corner card we had before. */
+  clip-path: polygon(
+    var(--card-corner-cut) 0,
+    100% 0,
+    100% calc(100% - var(--card-corner-cut)),
+    calc(100% - var(--card-corner-cut)) 100%,
+    0 100%,
+    0 var(--card-corner-cut)
+  );
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.slot {
+  position: relative;
+  overflow: hidden; /* clips the hover sweep pseudo-element below */
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--panel-border);
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  /* box-shadow at 0px here is what the hover rule's var(--hover-border-width)
+     grows FROM — both need to be present for the change to animate
+     instead of snapping. The 200ms below controls how fast it grows;
+     raise/lower it alongside the 200ms easing in the hover rule to keep
+     the two in sync. */
+  box-shadow: inset 0 0 0 0px var(--accent-red);
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease,
+    box-shadow 200ms ease;
+}
+
+.slot:last-child {
+  border-bottom: none;
+}
+
+/* THE CORNER FIX (take 2)
+   .match's own clip-path always cuts this diagonal corner for every
+   descendant — a straight-edged box-shadow border can only draw
+   straight lines, so it just stops there. My first attempt at patching
+   this drew the accent as a CSS clip-path fill (a thin parallelogon),
+   but a shape that thin, at that angle, rasterizes with visible
+   jagged/stepped edges in practice — clip-path fills don't anti-alias
+   a few-pixels-wide diagonal sliver nearly as cleanly as a real stroked
+   line does.
+   This version draws the accent as an actual SVG <line> with a stroke
+   instead of a filled shape — line rendering is anti-aliased properly
+   even at this thickness. Each corner slot gets a small SVG sized to
+   its own box, containing one line running along the SAME diagonal as
+   .match's cut (x1/y1/x2/y2 hardcoded to match --card-corner-cut — see
+   that variable's comment). The bottom-right corner reuses the exact
+   same line by just rotating its SVG 180°, rather than duplicating the
+   coordinates mirrored by hand. See round1.html for the markup and
+   round1.js for why .slot's rendering functions now target a nested
+   .slot-label span instead of the button's textContent. */
+.corner-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.corner-svg--br {
+  transform: rotate(180deg);
+}
+
+.corner-line {
+  stroke: var(--accent-red);
+  stroke-width: 0;
+  transition: stroke-width 200ms ease;
+}
+
+.slot:hover:not(:disabled) .corner-line {
+  /* Doubled on purpose: the line's centerline sits exactly on .match's
+     clip-path edge, so an SVG stroke of width W straddles that edge
+     evenly — only the inner W/2 stays visible once the ancestor clips
+     away the outer half. Asking for double var(--hover-border-width)
+     means the visible remainder matches the straight-edge box-shadow
+     border's thickness exactly. */
+  stroke-width: calc(var(--hover-border-width) * 2);
+}
+
+/* The animated background: a diagonal striped layer that's invisible at
+   rest and sweeps across the button on hover, similar to the flash/sheen
+   Smash Ultimate plays over a highlighted menu entry. Only ever shown on
+   enabled buttons — a disabled or greyed-out slot never animates. */
+.slot::after {
+  content: '';
+  position: absolute;
+  inset: -20% -40%;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(238, 240, 245, 0.1) 0 10px,
+    transparent 10px 22px
+  );
+  transform: translateX(-25%);
+  opacity: 0;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+
+.slot:hover:not(:disabled)::after {
+  opacity: 1;
+  /* Reads --hover-sweep-duration from :root above — change the value
+     there (or override it here) to speed this up or slow it down. */
+  animation: slotSweep var(--hover-sweep-duration) linear infinite;
+}
+
+.slot:hover:not(:disabled) {
+  background: rgba(41, 211, 197, 0.08);
+  /* Growing border effect: box-shadow's spread radius goes from 0 to
+     var(--hover-border-width) on hover. Using an inset box-shadow
+     instead of a real `border` means it grows/shrinks without nudging
+     any layout or row heights — it just paints on top. This variable is
+     shared with the diagonal corner accent above, so the two edges of
+     the border always stay the same thickness. */
+  box-shadow: inset 0 0 0 var(--hover-border-width) var(--accent-red);
+}
+
+@keyframes slotSweep {
+  from {
+    transform: translateX(-25%);
+  }
+  to {
+    transform: translateX(25%);
+  }
+}
+
+/* Respect reduced-motion preferences: keep the hover highlight, drop the
+   animation. */
+@media (prefers-reduced-motion: reduce) {
+  .slot:hover:not(:disabled)::after {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.slot:focus-visible {
+  outline: 2px solid var(--accent-red);
+  outline-offset: -2px;
+}
+
+.slot.winner {
+  color: var(--accent-gold);
+  background: rgba(242, 183, 5, 0.1);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.slot.loser {
+  color: var(--loser);
+  background: var(--loser-bg);
+  cursor: not-allowed;
+}
+
+.slot:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* The bye slot (QF4, p1) has no opponent to show, so instead of printing
+   the word "BYE" it's left blank and styled exactly like a losing slot —
+   same muted grey, same background — so it visually reads as "eliminated
+   before the match even started." Its text is cleared in round1.js. */
+.slot.bye {
+  color: var(--loser);
+  background: var(--loser-bg);
+  cursor: not-allowed;
+}
+
+/* =========================================================================
+   FINAL
+   The oval "ring" around the final box is the highlight from the sketch —
+   built as an oversized, heavily rounded wrapper rather than an actual
+   ellipse, so the rectangular final box inside still reads clearly.
+   ========================================================================= */
+.final-ring {
+  justify-self: center;
+}
+
+.final-match {
+  width: 220px;
+  background: var(--panel);
+}
+
+.finalist {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text-muted);
+}
+
+.finalist:last-child {
+  border-bottom: none;
+}
+
+.finalist.decided {
+  color: var(--accent-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* =========================================================================
+   REVEAL / HIDE CONTROL
+   Sits below the bracket. Its label and pressed state are kept in sync
+   by round1.js — this file only defines what it looks like.
+   ========================================================================= */
+.bracket-controls {
+  max-width: 1080px;
+  margin: 40px auto 0;
+  text-align: center;
+}
+
+.toggle-btn {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--bg);
+  background: var(--accent-gold);
+  border: none;
+  padding: 12px 32px;
+  cursor: pointer;
+  /* Same small angled-corner language as the match cards, so the button
+     reads as part of the same UI rather than a generic default one. */
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.toggle-btn:hover {
+  background: var(--accent-red);
+}
+
+.toggle-btn:active {
+  transform: scale(0.97);
+}
+
+.toggle-btn:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 3px;
+}
+
+/* =========================================================================
+   ROUND NAVIGATION
+   Four placeholder buttons, one per bracket/round. Styled as a quieter,
+   secondary counterpart to .toggle-btn above (outlined rather than
+   filled) since these aren't the primary action on this page — except
+   .is-current, which flips to the same filled gold treatment so it's
+   obvious at a glance which round you're actually looking at.
+   ========================================================================= */
+.round-nav {
+  max-width: 1080px;
+  margin: 20px auto 0;
+  padding: 0 24px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.round-nav-btn {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  padding: 10px 20px;
+  cursor: pointer;
+  /* Same corner language as every other button/card on the page. */
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease,
+    transform 150ms ease;
+}
+
+.round-nav-btn:hover {
+  border-color: var(--accent-gold);
+  color: var(--text);
+}
+
+.round-nav-btn:active {
+  transform: scale(0.97);
+}
+
+.round-nav-btn:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 3px;
+}
+
+.round-nav-btn.is-current {
+  color: var(--bg);
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+  cursor: default;
+}
+
+.round-nav-btn.is-current:hover {
+  background: var(--accent-gold);
+  border-color: var(--accent-gold);
+}
