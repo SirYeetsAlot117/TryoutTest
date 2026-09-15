@@ -35,6 +35,14 @@ function render(remote) {
   const blurred = remote && typeof remote.blurred === 'boolean' ? remote.blurred : true;
   const updatedAt = remote && remote.updatedAt ? remote.updatedAt : null;
 
+  // Applied FIRST, on its own, before anything below that could throw.
+  // (This used to run last — if a later renderer threw because the page's
+  // markup didn't have an element it expected, this line never ran, and
+  // the bracket silently stopped blurring. Guarded + moved up so a
+  // markup mismatch anywhere else can never block this again.)
+  const bracketTree = document.getElementById('bracketTree');
+  if (bracketTree) bracketTree.classList.toggle('blurred', blurred);
+
   renderMatch(winners, 'qf1');
   renderMatch(winners, 'qf2');
   renderMatch(winners, 'qf3');
@@ -46,8 +54,6 @@ function render(remote) {
 
   renderBanner(blurred, updatedAt);
   renderProgress(winners);
-
-  document.getElementById('bracketTree').classList.toggle('blurred', blurred);
 }
 
 function renderMatch(winners, matchId) {
@@ -89,24 +95,32 @@ function renderBanner(blurred, updatedAt) {
   const banner = document.getElementById('statusBanner');
   const meta = document.getElementById('statusMeta');
 
-  banner.classList.toggle('hidden-state', blurred);
-  banner.classList.toggle('revealed-state', !blurred);
-  banner.textContent = blurred
-    ? 'Round 1: HIDDEN — matches not yet revealed'
-    : 'Round 1: REVEALED — live matches below';
+  if (banner) {
+    banner.classList.toggle('hidden-state', blurred);
+    banner.classList.toggle('revealed-state', !blurred);
+    banner.textContent = blurred
+      ? 'Round 1: HIDDEN — matches not yet revealed'
+      : 'Round 1: REVEALED — live matches below';
+  }
 
-  meta.textContent = updatedAt
-    ? `Last updated ${new Date(updatedAt).toLocaleTimeString()}`
-    : 'No activity yet — waiting for Round 1 to start';
+  if (meta) {
+    meta.textContent = updatedAt
+      ? `Last updated ${new Date(updatedAt).toLocaleTimeString()}`
+      : 'No activity yet — waiting for Round 1 to start';
+  }
 }
 
 function renderProgress(winners) {
+  const label = document.getElementById('progressLabel');
+  const fill = document.getElementById('progressFill');
+  // status.html no longer includes the progress bar markup — nothing to
+  // update. Bail out instead of throwing (a throw here used to stop the
+  // rest of render() from running, including the blur toggle above).
+  if (!label || !fill) return;
+
   const qfDecided = ['qf1', 'qf2', 'qf3', 'qf4'].filter((id) => winners[id] !== null).length;
   const sfDecided = ['sf1', 'sf2'].filter((id) => winners[id] !== null).length;
   const totalDecided = qfDecided + sfDecided;
-
-  const label = document.getElementById('progressLabel');
-  const fill = document.getElementById('progressFill');
 
   label.textContent =
     `${totalDecided} of 6 matches decided` +
