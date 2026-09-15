@@ -120,7 +120,14 @@
        plain, non-interactive <div> — this page only ever displays state,
        it never changes it. -->
   <div class="bracket-scroll">
-    <div class="bracket-tree" id="bracketTree">
+    <!-- Starts blurred in the markup itself (not just via JS after
+         Firebase responds) — if the "blurred" class were only added
+         once status2.js's first render() runs, the CSS transition on
+         .bracket-tree's filter would animate FROM clear TO blurred,
+         and real names (already in the DOM by then) would be briefly
+         legible during that ramp-up. Starting pre-blurred means that
+         transition never has anything to animate away from. -->
+    <div class="bracket-tree blurred" id="bracketTree">
       <svg class="connectors" id="connectorSvg"></svg>
 
       <div class="match" data-match="qf1" style="grid-column: 1; grid-row: 1;">
