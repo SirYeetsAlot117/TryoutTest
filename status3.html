@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Esports Tryouts - Bracket 3 Live Status</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- A handful of rules specific to this read-only page: the status
+       banner, the progress bar, and stripping the interactive hover/
+       click affordances off the reused .slot styling (this page's
+       "slots" are plain <div>s, not buttons — no click handler exists
+       to disable, so the leftover pointer-cursor/hover-sweep from
+       styles.css is turned off here instead). -->
+  <style>
+    .status-banner {
+      max-width: 1080px;
+      margin: 0 auto 40px;
+      padding: 16px 24px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.02em;
+      border: 1px solid var(--panel-border);
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+      transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+    }
+
+    .status-banner.hidden-state {
+      background: var(--loser-bg);
+      color: var(--loser);
+      border-color: var(--panel-border);
+    }
+
+    .status-banner.revealed-state {
+      background: rgba(242, 183, 5, 0.1);
+      color: var(--accent-gold);
+      border-color: var(--accent-gold);
+    }
+
+    .status-meta {
+      max-width: 1080px;
+      margin: -24px auto 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .progress-wrap {
+      max-width: 1080px;
+      margin: 0 auto 56px;
+      text-align: center;
+    }
+
+    .progress-label {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: 0 0 10px;
+    }
+
+    .progress-track {
+      height: 8px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-gold);
+      width: 0%;
+      transition: width 300ms ease;
+    }
+
+    /* This page's match slots are read-only <div>s — remove the
+       button-only affordances (pointer cursor, hover sweep/border) that
+       .slot otherwise brings in from styles.css, since nothing here is
+       clickable. */
+    .bracket-tree .slot {
+      cursor: default;
+    }
+    .bracket-tree .slot:hover {
+      background: transparent !important;
+      box-shadow: inset 0 0 0 0 var(--accent-red) !important;
+    }
+    .bracket-tree .slot::after {
+      display: none;
+    }
+
+    .back-link {
+      max-width: 1080px;
+      margin: 16px auto 0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fireCanvas" aria-hidden="true"></canvas>
+
+  <header class="tournament-header">
+    <h1><span class="divider">·</span> Single Elimination <span class="divider">-</span> Round 3 <span class="divider">·</span></h1>
+    <p></p>
+    <p id="statusMeta" class="status-meta">Waiting for data…</p>
+  </header>
+
+  <hr class="section-divider" />
+
+  <!-- Filled in by status.js: reflects whatever the admin last saved in
+       Firebase (blurred vs revealed). -->
+  <div id="statusBanner" class="status-banner hidden-state">Checking Round 3 status…</div>
+  
+  <!-- Same grid layout as index.html's bracket, but every slot is a
+       plain, non-interactive <div> — this page only ever displays state,
+       it never changes it. -->
+  <div class="bracket-scroll">
+    <div class="bracket-tree" id="bracketTree">
+      <svg class="connectors" id="connectorSvg"></svg>
+
+      <div class="match" data-match="qf1" style="grid-column: 1; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match" data-match="qf2" style="grid-column: 2; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match" data-match="qf3" style="grid-column: 3; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match" data-match="qf4" style="grid-column: 4; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+
+      <div class="match match-sf" data-match="sf1" style="grid-column: 1 / span 2; grid-row: 2;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match match-sf" data-match="sf2" style="grid-column: 3 / span 2; grid-row: 2;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+
+      <div class="final-ring" style="grid-column: 1 / span 4; grid-row: 3;">
+        <div class="match final-match" data-match="final">
+          <div class="finalist" data-slot="p1">TBD</div>
+          <div class="finalist" data-slot="p2">TBD</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="section-divider" />
+
+  <nav class="round-nav" aria-label="Tournament rounds">
+    <button class="round-nav-btn" type="button" onclick="window.location.href='status.html'">Single Elimination Round 1</button>
+    <button class="round-nav-btn" type="button" onclick="window.location.href='status2.html'">Single Elimination Round 2</button>
+    <button class="round-nav-btn is-current" type="button" aria-current="page">
+      Single Elimination Round 3
+    </button>
+    <button class="round-nav-btn" type="button">Round Robin</button>
+  </nav>
+
+  <script src="fire.js"></script>
+  <script src="bracketData3.js"></script>
+  <!-- type="module" — needed so status3.js can `import` Firebase and
+       firebase-sync.js. -->
+  <script type="module" src="status3.js"></script>
+</body>
+</html>
