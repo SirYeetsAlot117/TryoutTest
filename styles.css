@@ -17,6 +17,12 @@
 
   --radius: 4px;
 
+  /* ---- EDIT HERE to change how wide EVERY match card is (quarterfinal,
+     semifinal, and final alike) ---- One variable, used by the grid
+     columns themselves and by .match/.final-match's width, so all three
+     levels are always guaranteed to be the same size as each other. */
+  --match-width: 220px;
+
   /* ---- EDIT HERE to change the hover sweep animation's speed ----
      Higher = slower. This is the single value slotSweep's animation
      duration reads from (see the .slot:hover rule further down). */
@@ -170,7 +176,7 @@ body {
 .bracket-tree {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, var(--match-width));
   row-gap: 84px;
   column-gap: 20px;
   min-width: 780px;
@@ -209,10 +215,13 @@ body {
   stroke-linecap: round;
 }
 
-.match-sf {
-  justify-self: center;
-  width: 80%;
-}
+/* .match-sf previously set its own width: 80% here, which is why
+   semifinal boxes rendered a different size than quarterfinal/final
+   ones. .match below now gives every level (QF, SF, final) the exact
+   same width via --match-width, so nothing level-specific is needed
+   here anymore — .match-sf still exists in the markup purely to widen
+   this row's grid-column span (so it sits centered under its feeder
+   pair), not to resize the box itself. */
 
 /* =========================================================================
    MATCH CARD
@@ -222,6 +231,14 @@ body {
 .match {
   position: relative;
   z-index: 1; /* sits above the connector lines */
+  /* The one place box size is set for every level — QF boxes each sit
+     in a 1-column grid area exactly --match-width wide, so this has no
+     visible effect on them; SF/final boxes sit in WIDER grid areas (2
+     and 4 columns respectively, so they land centered under their
+     feeders), and without an explicit width+justify-self here they'd
+     stretch to fill that whole area instead of matching QF's size. */
+  width: var(--match-width);
+  justify-self: center;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   display: flex;
@@ -415,7 +432,7 @@ body {
 }
 
 .final-match {
-  width: 220px;
+  width: var(--match-width); /* was a separate hardcoded 220px — now always matches every other level */
   background: var(--panel);
 }
 
