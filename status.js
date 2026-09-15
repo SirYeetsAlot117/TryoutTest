@@ -92,8 +92,8 @@ function renderBanner(blurred, updatedAt) {
   banner.classList.toggle('hidden-state', blurred);
   banner.classList.toggle('revealed-state', !blurred);
   banner.textContent = blurred
-    ? '🔒 Round 1 is currently HIDDEN — results not yet revealed'
-    : '👁 Round 1 is REVEALED — live results below';
+    ? 'Round 1: HIDDEN — matches not yet revealed'
+    : 'Round 1: REVEALED — live matches below';
 
   meta.textContent = updatedAt
     ? `Last updated ${new Date(updatedAt).toLocaleTimeString()}`

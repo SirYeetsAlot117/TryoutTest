@@ -105,8 +105,9 @@
   <canvas id="fireCanvas" aria-hidden="true"></canvas>
 
   <header class="tournament-header">
-    <h1><span class="divider">·</span> Bracket 1 <span class="divider">-</span> Live Status <span class="divider">·</span></h1>
-    <p class="sub">Read-only — updates automatically, nothing here is clickable</p>
+    <h1><span class="divider">·</span> Single Elimination <span class="divider">-</span> Round 1 <span class="divider">·</span></h1>
+    <p></p>
+    <p id="statusMeta" class="status-meta">Waiting for data…</p>
   </header>
 
   <hr class="section-divider" />
@@ -114,15 +115,7 @@
   <!-- Filled in by status.js: reflects whatever the admin last saved in
        Firebase (blurred vs revealed). -->
   <div id="statusBanner" class="status-banner hidden-state">Checking Round 1 status…</div>
-  <p id="statusMeta" class="status-meta">Waiting for data…</p>
-
-  <div class="progress-wrap">
-    <p id="progressLabel" class="progress-label">0 of 6 matches decided</p>
-    <div class="progress-track">
-      <div id="progressFill" class="progress-fill"></div>
-    </div>
-  </div>
-
+  
   <!-- Same grid layout as index.html's bracket, but every slot is a
        plain, non-interactive <div> — this page only ever displays state,
        it never changes it. -->

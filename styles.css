@@ -177,6 +177,7 @@ body {
   max-width: 1080px;
   margin: 0 auto;
   transition: filter 300ms ease;
+  justify-content: center;
 }
 
 /* Applied/removed by round1.js's toggle button. Blurs every match card

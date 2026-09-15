@@ -30,7 +30,7 @@ const FIRE_HEIGHT = 140;
 // by 1 (see spreadFire below), so roughly speaking a seed at max heat
 // survives about FIRE_MAX_HEAT rows before fully cooling to 0 — that's
 // what determines how far up the screen the fire visually reaches.
-const FIRE_MAX_HEAT = 35;
+const FIRE_MAX_HEAT = 20;
 
 function initFireCanvas() {
   const canvas = document.getElementById('fireCanvas');

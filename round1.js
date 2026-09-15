@@ -249,8 +249,8 @@ function updateAdminBanner() {
   const banner = document.getElementById('adminBanner');
   if (banner) {
     banner.textContent = isAdmin
-      ? '✅ Signed in as admin — your changes are live for everyone watching.'
-      : '👀 View-only link — you can watch live, but changes require the admin link.';
+      ? 'Signed in as admin — your changes are live for everyone watching.'
+      : 'View-only link — you can watch live, but changes require the admin link.';
     banner.classList.toggle('admin-yes', isAdmin);
     banner.classList.toggle('admin-no', !isAdmin);
   }
