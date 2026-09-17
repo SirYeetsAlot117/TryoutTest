@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Esports Tryouts - Round Robin Live Status</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Page-specific styling: the status banner/meta line and progress
+       bar (copied from status.html/2/3's versions) plus the round robin
+       grid itself (copied from admin4.html's, with the interactive
+       hover/cursor rules stripped since every cell here is a plain,
+       non-clickable <div> — same split status.html uses between its
+       read-only .slot divs and round1.html's .slot buttons). -->
+  <style>
+    .status-banner {
+      max-width: 1080px;
+      margin: 0 auto 40px;
+      padding: 16px 24px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.02em;
+      border: 1px solid var(--panel-border);
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+      transition: background 200ms ease, color 200ms ease, border-color 200ms ease;
+    }
+
+    .status-banner.hidden-state {
+      background: var(--loser-bg);
+      color: var(--loser);
+      border-color: var(--panel-border);
+    }
+
+    .status-banner.revealed-state {
+      background: rgba(242, 183, 5, 0.1);
+      color: var(--accent-gold);
+      border-color: var(--accent-gold);
+    }
+
+    .status-meta {
+      max-width: 1080px;
+      margin: -24px auto 40px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .progress-wrap {
+      max-width: 1080px;
+      margin: 0 auto 40px;
+      text-align: center;
+    }
+
+    .progress-label {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: 0 0 10px;
+    }
+
+    .progress-track {
+      height: 8px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent-gold);
+      width: 0%;
+      transition: width 300ms ease;
+    }
+
+    :root {
+      --rr-win: #3ea86b;
+      --rr-win-bg: rgba(62, 168, 107, 0.15);
+      --rr-cell-width: 130px;
+    }
+
+    /* Same overflow/padding reasoning as admin4.html — room for the
+       blurred grid's soft edge so this container's own clipping (an
+       unavoidable side effect of overflow-x: auto) doesn't cut it off
+       flat. */
+    .rr-scroll {
+      overflow-x: auto;
+      padding: calc(var(--blur-amount) * 2) 0 8px;
+    }
+
+    /* width: fit-content + margin: 0 auto is what actually centers a
+       grid whose track sizes are fixed (--rr-cell-width) rather than
+       1fr — a fixed-width box centers inside a wider container; a box
+       already stretched to fill its container has nothing to center. */
+    .rr-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--rr-size, 7), var(--rr-cell-width));
+      gap: 4px;
+      width: fit-content;
+      margin: 0 auto;
+      transition: filter 300ms ease;
+    }
+
+    .rr-grid.blurred {
+      filter: blur(var(--blur-amount));
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .rr-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 10px 8px;
+      min-height: 48px;
+    }
+
+    .rr-header {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.2;
+    }
+
+    .rr-diagonal {
+      background: var(--loser-bg);
+      border: 1px solid var(--panel-border);
+    }
+
+    /* No cursor/hover affordances here — these are plain divs, nothing
+       on this page is clickable. */
+    .rr-btn {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--text-muted);
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+    }
+
+    .rr-btn.rr-win {
+      background: var(--rr-win-bg);
+      border-color: var(--rr-win);
+      color: var(--rr-win);
+    }
+
+    .rr-btn.rr-loss {
+      background: var(--loser-bg);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .rr-legend {
+      max-width: 1080px;
+      margin: 20px auto 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fireCanvas" aria-hidden="true"></canvas>
+
+  <header class="tournament-header">
+    <h1><span class="divider">·</span> Round Robin <span class="divider">·</span></h1>
+    <p></p>
+    <p id="statusMeta" class="status-meta">Waiting for data…</p>
+  </header>
+
+  <hr class="section-divider" />
+
+  <!-- Filled in by status4.js: reflects whatever the admin last saved
+       in Firebase (blurred vs revealed). -->
+  <div id="statusBanner" class="status-banner hidden-state">Checking Round Robin status…</div>
+
+  <!-- Built entirely in status4.js from window.RR_PARTICIPANTS
+       (bracketData4.js), same as admin4.html's grid, so the two always
+       agree on size and roster. Starts blurred in the markup itself
+       (not just via JS after Firebase responds) — same reasoning as
+       status.html/2/3's bracket-tree: if "blurred" were only added once
+       status4.js's first render() runs, the CSS transition on
+       .rr-grid's filter would animate FROM clear TO blurred, and any
+       results already written into the DOM by then would be briefly
+       legible during that ramp-up. -->
+  <div class="rr-scroll">
+    <div class="rr-grid blurred" id="rrGrid"></div>
+  </div>
+
+  <hr class="section-divider" />
+
+  <nav class="round-nav" aria-label="Tournament rounds">
+    <button class="round-nav-btn" type="button" onclick="window.location.href='status.html'">Single Elimination Round 1</button>
+    <button class="round-nav-btn" type="button" onclick="window.location.href='status2.html'">Single Elimination Round 2</button>
+    <button class="round-nav-btn" type="button" onclick="window.location.href='status3.html'">Single Elimination Round 3</button>
+    <button class="round-nav-btn is-current" type="button" aria-current="page">
+      Round Robin
+    </button>
+  </nav>
+
+  <script src="fire.js"></script>
+  <script src="bracketData4.js"></script>
+  <!-- type="module" — needed so status4.js can `import` Firebase and
+       firebase-sync4.js. -->
+  <script type="module" src="status4.js"></script>
+</body>
+</html>

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Esports Tryouts - Round Robin</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Page-specific styling for the round robin grid, kept local here
+       the same way admin2.html/admin3.html keep their admin-banner
+       colors local rather than adding them to styles.css. Reuses the
+       shared design tokens (--panel, --panel-border, --text, --blur-
+       amount, etc.) and adds one new local token, --rr-win, since
+       styles.css doesn't define a "win" color of its own (--accent-gold
+       means something different elsewhere — the champion/revealed
+       state — so a distinct green keeps this grid's win/loss reading
+       unambiguous at a glance). -->
+  <style>
+    .admin-banner {
+      max-width: 1080px;
+      margin: 0 auto 40px;
+      padding: 12px 24px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: 1px solid var(--panel-border);
+      clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    }
+    .admin-banner.admin-yes {
+      background: rgba(242, 183, 5, 0.1);
+      color: var(--accent-gold);
+      border-color: var(--accent-gold);
+    }
+    .admin-banner.admin-no {
+      background: var(--loser-bg);
+      color: var(--loser);
+    }
+
+    :root {
+      --rr-win: #3ea86b;
+      --rr-win-bg: rgba(62, 168, 107, 0.15);
+      /* EDIT HERE to change every grid cell's width (header cells and
+         match cells alike) — one variable so the grid's own box width
+         (columns * this) always matches what's used to center it. */
+      --rr-cell-width: 130px;
+    }
+
+    /* Same "keep the shape, scroll sideways instead of collapsing"
+       approach as .bracket-scroll in styles.css, including the extra
+       top padding: overflow-x: auto forces overflow-y to clip too, and
+       without this room the blurred grid's soft edge (filter: blur()
+       bleeds outward like a drop shadow) gets cut off flat instead of
+       fading out. */
+    .rr-scroll {
+      overflow-x: auto;
+      padding: calc(var(--blur-amount) * 2) 0 8px;
+    }
+
+    /* width: fit-content (rather than letting the grid stretch to fill
+       .rr-scroll, which is what repeat(N, 1fr) columns would do) is
+       what makes `margin: 0 auto` actually center the grid — a fixed-
+       width box centers inside a wider container; a box that's already
+       stretched to match its container's width has nothing to center
+       within. Same reasoning as .bracket-tree's fixed --match-width
+       columns in styles.css. */
+    .rr-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--rr-size, 7), var(--rr-cell-width));
+      gap: 4px;
+      width: fit-content;
+      margin: 0 auto;
+      transition: filter 300ms ease;
+    }
+
+    /* Toggled by round4.js's reveal/hide button — identical mechanism
+       to .bracket-tree.blurred in styles.css, just scoped to this
+       page's grid element directly (there's no separate wrapper here). */
+    .rr-grid.blurred {
+      filter: blur(var(--blur-amount));
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .rr-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 10px 8px;
+      min-height: 48px;
+    }
+
+    .rr-header {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.2;
+    }
+
+    .rr-diagonal {
+      background: var(--loser-bg);
+      border: 1px solid var(--panel-border);
+    }
+
+    .rr-btn {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--text-muted);
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+
+    .rr-btn:not(:disabled):hover {
+      border-color: var(--text);
+      color: var(--text);
+    }
+
+    .rr-btn:not(:disabled):active {
+      transform: scale(0.96);
+    }
+
+    .rr-btn:disabled {
+      cursor: not-allowed;
+    }
+
+    /* Clicked once. */
+    .rr-btn.rr-win {
+      background: var(--rr-win-bg);
+      border-color: var(--rr-win);
+      color: var(--rr-win);
+    }
+
+    /* Clicked twice. A third click on either state resets to the plain
+       .rr-btn look above. */
+    .rr-btn.rr-loss {
+      background: var(--loser-bg);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .rr-legend {
+      max-width: 1080px;
+      margin: 20px auto 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fireCanvas" aria-hidden="true"></canvas>
+
+  <header class="tournament-header">
+    <h1><span class="divider">·</span> Round Robin Admin Control <span class="divider">·</span></h1>
+  </header>
+
+  <hr class="section-divider" />
+
+  <!-- Filled in by round4.js on load: tells whoever opened this page
+       whether THEY can edit it (i.e. whether this URL had a valid
+       ?key=... admin token) or are just watching. -->
+  <p id="adminBanner" class="admin-banner admin-no">Checking access…</p>
+
+  <!--
+    The grid itself is built entirely in round4.js from
+    window.RR_PARTICIPANTS (bracketData4.js) — nothing is hardcoded here
+    beyond the empty container, so the grid always matches however many
+    names are in that list. Each non-diagonal button cycles: click once
+    for a win (green), twice for a loss (red), a third time to reset —
+    and the opposing button (row/column swapped) is set to the mirror
+    result in that same click, since one match can't have two winners.
+  -->
+  <div class="rr-scroll">
+    <div class="rr-grid" id="rrGrid"></div>
+  </div>
+
+  <!-- Same reveal/hide control as round1.html/2/3 (.bracket-controls
+       and .toggle-btn are already defined in styles.css — nothing extra
+       needed here). round4.js hides this entirely for non-admin (no
+       ?key=) visitors. -->
+  <div class="bracket-controls">
+    <button id="bracketToggle" class="toggle-btn" type="button" aria-pressed="false">
+      Reveal Bracket
+    </button>
+  </div>
+
+  <hr class="section-divider" />
+
+  <nav class="round-nav" aria-label="Tournament rounds">
+    <button class="round-nav-btn" type="button" onclick="window.location.href='index.html'">Round 1 Admin Control</button>
+    <button class="round-nav-btn" type="button" onclick="window.location.href='admin2.html'">Round 2 Admin Control</button>
+    <button class="round-nav-btn" type="button" onclick="window.location.href='admin3.html'">Round 3 Admin Control</button>
+    <button class="round-nav-btn is-current" type="button" aria-current="page">
+      Admin Control Round Robin
+    </button>
+  </nav>
+
+  <script src="fire.js"></script>
+  <script src="bracketData4.js"></script>
+  <!-- type="module" — needed so round4.js can `import` Firebase and
+       firebase-sync4.js. Module scripts run after the document has been
+       parsed (like `defer`), so bracketData4.js above has already set
+       window.RR_PARTICIPANTS by the time this runs. -->
+  <script type="module" src="round4.js"></script>
+</body>
+</html>
