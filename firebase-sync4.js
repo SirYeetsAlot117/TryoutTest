@@ -1,7 +1,12 @@
 /* =========================================================================
-   FIREBASE SYNC — round4.js (the round robin control page). Same shape as
-   firebase-sync.js/2/3, just pointed at its own 'bracket4' node so it
-   never collides with the three single-elimination brackets.
+   FIREBASE SYNC — shared by round3.js (control page) and status3.js
+   (read-only display). Everything both pages need to talk to Firebase
+   lives here so neither file has to duplicate the setup.
+
+   Loaded via the Firebase JS SDK's own CDN as ES modules — no npm/build
+   step needed, works fine served as plain static files (GitHub Pages,
+   etc). Pinned to a specific version on purpose: gstatic keeps old
+   versions available indefinitely, so this won't break under you later.
    ========================================================================= */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
 import {
@@ -22,20 +27,22 @@ const auth = getAuth(app);
 const bracket4Ref = ref(db, 'bracket4');
 
 /**
- * Subscribes to live changes on the round robin's state. Calls `callback`
+ * Subscribes to live changes on Bracket 3's state. Calls `callback`
  * immediately with whatever's currently stored (or `null` if nothing has
  * ever been written yet), and again every time it changes — on ANY
- * device, admin or viewer.
+ * device, admin or viewer. This is what makes every open page update
+ * automatically with no polling.
  */
 export function subscribeState(callback) {
   onValue(bracket4Ref, (snapshot) => callback(snapshot.val()));
 }
 
 /**
- * Writes a full replacement state object ({ results, updatedAt }). Only
- * actually succeeds if the caller is signed in as the admin account —
- * enforced server-side by the database's security rules, same as the
- * other three brackets.
+ * Writes a full replacement state object ({ winners, blurred, updatedAt }).
+ * Only actually succeeds if the caller is signed in as the admin account
+ * — that's enforced server-side by the database's security rules, not by
+ * this function, so treat a rejected promise as "not allowed," not as a
+ * bug to work around client-side.
  */
 export function writeState(state) {
   return set(bracket4Ref, state);
@@ -44,7 +51,9 @@ export function writeState(state) {
 /**
  * Looks for ?key=... in the current page's URL and, if present, tries to
  * sign in as the one admin account using it as the password. Resolves to
- * true if that succeeded (this visitor can now write), false otherwise.
+ * true if that succeeded (this visitor can now write), false otherwise
+ * (no key, wrong key, or offline) — callers should treat false as
+ * "read-only," not show an error.
  */
 export async function trySignInFromUrl() {
   const key = new URLSearchParams(window.location.search).get('key');

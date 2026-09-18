@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Esports Tryouts - Round Robin Live Status</title>
+  <title>Esports Tryouts - Bracket 4 Live Status</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
@@ -13,12 +13,12 @@
 
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Page-specific styling: the status banner/meta line and progress
-       bar (copied from status.html/2/3's versions) plus the round robin
-       grid itself (copied from admin4.html's, with the interactive
-       hover/cursor rules stripped since every cell here is a plain,
-       non-clickable <div> — same split status.html uses between its
-       read-only .slot divs and round1.html's .slot buttons). -->
+  <!-- A handful of rules specific to this read-only page: the status
+       banner, the progress bar, and stripping the interactive hover/
+       click affordances off the reused .slot styling (this page's
+       "slots" are plain <div>s, not buttons — no click handler exists
+       to disable, so the leftover pointer-cursor/hover-sweep from
+       styles.css is turned off here instead). -->
   <style>
     .status-banner {
       max-width: 1080px;
@@ -55,7 +55,7 @@
 
     .progress-wrap {
       max-width: 1080px;
-      margin: 0 auto 40px;
+      margin: 0 auto 56px;
       text-align: center;
     }
 
@@ -79,91 +79,25 @@
       transition: width 300ms ease;
     }
 
-    :root {
-      --rr-win: #3ea86b;
-      --rr-win-bg: rgba(62, 168, 107, 0.15);
-      --rr-cell-width: 130px;
+    /* This page's match slots are read-only <div>s — remove the
+       button-only affordances (pointer cursor, hover sweep/border) that
+       .slot otherwise brings in from styles.css, since nothing here is
+       clickable. */
+    .bracket-tree .slot {
+      cursor: default;
+    }
+    .bracket-tree .slot:hover {
+      background: transparent !important;
+      box-shadow: inset 0 0 0 0 var(--accent-red) !important;
+    }
+    .bracket-tree .slot::after {
+      display: none;
     }
 
-    /* Same overflow/padding reasoning as admin4.html — room for the
-       blurred grid's soft edge so this container's own clipping (an
-       unavoidable side effect of overflow-x: auto) doesn't cut it off
-       flat. */
-    .rr-scroll {
-      overflow-x: auto;
-      padding: calc(var(--blur-amount) * 2) 0 8px;
-    }
-
-    /* width: fit-content + margin: 0 auto is what actually centers a
-       grid whose track sizes are fixed (--rr-cell-width) rather than
-       1fr — a fixed-width box centers inside a wider container; a box
-       already stretched to fill its container has nothing to center. */
-    .rr-grid {
-      display: grid;
-      grid-template-columns: repeat(var(--rr-size, 7), var(--rr-cell-width));
-      gap: 4px;
-      width: fit-content;
-      margin: 0 auto;
-      transition: filter 300ms ease;
-    }
-
-    .rr-grid.blurred {
-      filter: blur(var(--blur-amount));
-      pointer-events: none;
-      user-select: none;
-    }
-
-    .rr-cell {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 10px 8px;
-      min-height: 48px;
-    }
-
-    .rr-header {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-weight: 700;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      line-height: 1.2;
-    }
-
-    .rr-diagonal {
-      background: var(--loser-bg);
-      border: 1px solid var(--panel-border);
-    }
-
-    /* No cursor/hover affordances here — these are plain divs, nothing
-       on this page is clickable. */
-    .rr-btn {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-weight: 800;
-      font-size: 1rem;
-      color: var(--text-muted);
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-    }
-
-    .rr-btn.rr-win {
-      background: var(--rr-win-bg);
-      border-color: var(--rr-win);
-      color: var(--rr-win);
-    }
-
-    .rr-btn.rr-loss {
-      background: var(--loser-bg);
-      border-color: var(--accent-red);
-      color: var(--accent-red);
-    }
-
-    .rr-legend {
+    .back-link {
       max-width: 1080px;
-      margin: 20px auto 0;
+      margin: 16px auto 0;
       text-align: center;
-      color: var(--text-muted);
-      font-size: 0.8rem;
     }
   </style>
 </head>
@@ -171,28 +105,64 @@
   <canvas id="fireCanvas" aria-hidden="true"></canvas>
 
   <header class="tournament-header">
-    <h1><span class="divider">·</span> Round Robin <span class="divider">·</span></h1>
+    <h1><span class="divider">·</span> Single Elimination <span class="divider">-</span> Round 4 <span class="divider">·</span></h1>
     <p></p>
     <p id="statusMeta" class="status-meta">Waiting for data…</p>
   </header>
 
   <hr class="section-divider" />
 
-  <!-- Filled in by status4.js: reflects whatever the admin last saved
-       in Firebase (blurred vs revealed). -->
-  <div id="statusBanner" class="status-banner hidden-state">Checking Round Robin status…</div>
+  <!-- Filled in by status.js: reflects whatever the admin last saved in
+       Firebase (blurred vs revealed). -->
+  <div id="statusBanner" class="status-banner hidden-state">Checking Round 4 status…</div>
+  
+  <!-- Same grid layout as index.html's bracket, but every slot is a
+       plain, non-interactive <div> — this page only ever displays state,
+       it never changes it. -->
+  <div class="bracket-scroll">
+    <!-- Starts blurred in the markup itself (not just via JS after
+         Firebase responds) — if the "blurred" class were only added
+         once status3.js's first render() runs, the CSS transition on
+         .bracket-tree's filter would animate FROM clear TO blurred,
+         and real names (already in the DOM by then) would be briefly
+         legible during that ramp-up. Starting pre-blurred means that
+         transition never has anything to animate away from. -->
+    <div class="bracket-tree blurred" id="bracketTree">
+      <svg class="connectors" id="connectorSvg"></svg>
 
-  <!-- Built entirely in status4.js from window.RR_PARTICIPANTS
-       (bracketData4.js), same as admin4.html's grid, so the two always
-       agree on size and roster. Starts blurred in the markup itself
-       (not just via JS after Firebase responds) — same reasoning as
-       status.html/2/3's bracket-tree: if "blurred" were only added once
-       status4.js's first render() runs, the CSS transition on
-       .rr-grid's filter would animate FROM clear TO blurred, and any
-       results already written into the DOM by then would be briefly
-       legible during that ramp-up. -->
-  <div class="rr-scroll">
-    <div class="rr-grid blurred" id="rrGrid"></div>
+      <div class="match" data-match="qf1" style="grid-column: 1; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match" data-match="qf2" style="grid-column: 2; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match" data-match="qf3" style="grid-column: 3; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match" data-match="qf4" style="grid-column: 4; grid-row: 1;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+
+      <div class="match match-sf" data-match="sf1" style="grid-column: 1 / span 2; grid-row: 2;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+      <div class="match match-sf" data-match="sf2" style="grid-column: 3 / span 2; grid-row: 2;">
+        <div class="slot" data-slot="p1"><span class="slot-label">TBD</span></div>
+        <div class="slot" data-slot="p2"><span class="slot-label">TBD</span></div>
+      </div>
+
+      <div class="final-ring" style="grid-column: 1 / span 4; grid-row: 3;">
+        <div class="match final-match" data-match="final">
+          <div class="finalist" data-slot="p1">TBD</div>
+          <div class="finalist" data-slot="p2">TBD</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <hr class="section-divider" />
@@ -202,14 +172,14 @@
     <button class="round-nav-btn" type="button" onclick="window.location.href='status2.html'">Single Elimination Round 2</button>
     <button class="round-nav-btn" type="button" onclick="window.location.href='status3.html'">Single Elimination Round 3</button>
     <button class="round-nav-btn is-current" type="button" aria-current="page">
-      Round Robin
+      Single Elimination Round 4
     </button>
   </nav>
 
   <script src="fire.js"></script>
   <script src="bracketData4.js"></script>
-  <!-- type="module" — needed so status4.js can `import` Firebase and
-       firebase-sync4.js. -->
+  <!-- type="module" — needed so status3.js can `import` Firebase and
+       firebase-sync.js. -->
   <script type="module" src="status4.js"></script>
 </body>
 </html>

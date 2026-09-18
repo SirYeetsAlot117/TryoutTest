@@ -1,22 +1,22 @@
 /* =========================================================================
-   ROUND ROBIN — SHARED DATA
-   The six semifinal losers from Brackets 1–3 play a round robin here.
-   Same window.* trick as bracketData.js/2/3: an unambiguous way for the
-   module scripts loaded after this classic <script> tag (round4.js) to
-   read the roster.
-
-   PLACEHOLDER NAMES — the real roster isn't known until Rounds 1–3
-   finish producing semifinal losers. Swap these six for the real names
-   once they're decided; the grid in admin4.html resizes itself to
-   however many names are listed here (no other file needs to change).
+   BRACKET 3 — SHARED DATA
+   Same shape as bracketData.js (Bracket 1) — loaded before round3.js and
+   status3.js (both ES modules), so both pages always agree on the
+   roster. Window.* assignment is the same trick as bracketData.js: an
+   unambiguous way for the module scripts loaded after it to read this.
    ========================================================================= */
-const PARTICIPANTS = [
-  'Player 1',
-  'Player 2',
-  'Player 3',
-  'Player 4',
-  'Player 5',
-  'Player 6',
-];
+const QUARTERFINAL_PLAYERS = {
+  qf1: { p1: 'Malik Jacques', p2: 'Hayden Casey' },
+  qf2: { p1: "Landon D'Albenzio", p2: 'Abraham Louis' },
+  qf3: { p1: 'Emmanuel Montero', p2: 'Aleksei Bitkin' },
+  qf4: { p1: 'Nicolas Sieckowski', p2: 'Matheus Peruchi' },
+};
 
-window.RR_PARTICIPANTS = PARTICIPANTS;
+const FEEDERS = {
+  sf1: { p1: 'qf1', p2: 'qf2' },
+  sf2: { p1: 'qf3', p2: 'qf4' },
+  final: { p1: 'sf1', p2: 'sf2' },
+};
+
+window.QUARTERFINAL_PLAYERS = QUARTERFINAL_PLAYERS;
+window.FEEDERS = FEEDERS;

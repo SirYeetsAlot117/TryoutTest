@@ -99,14 +99,14 @@ function renderBanner(blurred, updatedAt) {
     banner.classList.toggle('hidden-state', blurred);
     banner.classList.toggle('revealed-state', !blurred);
     banner.textContent = blurred
-      ? 'Round 1: HIDDEN — matches not yet revealed'
-      : 'Round 1: REVEALED — live matches below';
+      ? 'Round 3: HIDDEN — matches not yet revealed'
+      : 'Round 3: REVEALED — live matches below';
   }
 
   if (meta) {
     meta.textContent = updatedAt
       ? `Last updated ${new Date(updatedAt).toLocaleTimeString()}`
-      : 'No activity yet — waiting for Round 1 to start';
+      : 'No activity yet — waiting for Round 3 to start';
   }
 }
 

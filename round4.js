@@ -1,180 +1,249 @@
 /* =========================================================================
-   ROUND ROBIN — CONTROL PAGE
-   Same `type="module"` + Firebase pattern as round1.js/2.js/3.js. State
-   lives in Firebase Realtime Database (see firebase-sync4.js) instead of
-   localStorage, so every device watching sees the same grid live.
+   BRACKET 3 — CONTROL PAGE
+   This is now a `type="module"` script (see index.html) so it can import
+   Firebase. State lives in Firebase Realtime Database instead of
+   localStorage, so every device watching sees the same bracket live.
 
    EDIT ACCESS: only a visitor who opened this page with the correct
-   ?key=... is treated as admin (checked by trySignInFromUrl() against
-   the one admin account — see SETUP.md). Everyone else gets this same
-   page, live, with every cell disabled — a "plain" link is simply this
-   URL without ?key.
+   ?key=... in the URL is treated as admin (see isAdmin below) — that key
+   is checked by trySignInFromUrl() against the one admin account you set
+   up in Firebase (see SETUP.md). Everyone else gets this exact same
+   page, fully live, just with every button disabled — a "plain" link is
+   simply this URL without the ?key.
 
-   PARTICIPANTS comes from bracketData4.js's window.RR_PARTICIPANTS
-   (loaded via a classic <script> tag before this one). The grid's size
-   is entirely driven by that list's length — add/remove names there and
-   nothing here needs to change.
+   QUARTERFINAL_PLAYERS / FEEDERS come from bracketData.js's window.*
+   exports (loaded via a classic <script> tag before this one).
    ========================================================================= */
 import { subscribeState, writeState, trySignInFromUrl } from './firebase-sync4.js';
 
-const PARTICIPANTS = window.RR_PARTICIPANTS;
-const N = PARTICIPANTS.length;
+const QUARTERFINAL_PLAYERS = window.QUARTERFINAL_PLAYERS;
+const FEEDERS = window.FEEDERS;
 
 /* =========================================================================
    STATE
-   results[r][c]: 0 = undecided, 1 = row player beat column player,
-   2 = row player lost to column player. The diagonal (r === c) is
-   never read or written — there's no such thing as a player playing
-   themselves. results[r][c] and results[c][r] are always kept as
-   mirror-opposites of each other by setCell() below, so the grid can
-   never show two people both "beating" each other.
    ========================================================================= */
-function emptyResults() {
-  return Array.from({ length: N }, () => Array(N).fill(0));
-}
+const winners = {
+  qf1: null,
+  qf2: null,
+  qf3: null,
+  qf4: null,
+  sf1: null,
+  sf2: null,
+};
 
-let results = emptyResults();
 let isBlurred = true;
 let isAdmin = false; // set once, at startup, by init() below
 
 /* =========================================================================
-   STATE MUTATION (admin only — see isAdmin check below)
+   HELPERS
    ========================================================================= */
-function mirrorState(state) {
-  // 1 (row won) mirrors to 2 (column's own row lost) and vice versa;
-  // 0 mirrors to 0.
-  if (state === 1) return 2;
-  if (state === 2) return 1;
-  return 0;
+function getMatchPlayers(matchId) {
+  if (QUARTERFINAL_PLAYERS[matchId]) {
+    return QUARTERFINAL_PLAYERS[matchId];
+  }
+  const feeders = FEEDERS[matchId];
+  return {
+    p1: winners[feeders.p1] ?? null,
+    p2: winners[feeders.p2] ?? null,
+  };
 }
 
-function handleCellClick(r, c) {
-  if (!isAdmin || r === c) return; // belt-and-suspenders — diagonal cells are never wired up anyway
+function getDownstreamMatches(matchId) {
+  return Object.keys(FEEDERS).filter(
+    (id) => FEEDERS[id].p1 === matchId || FEEDERS[id].p2 === matchId
+  );
+}
 
-  const next = (results[r][c] + 1) % 3; // none -> win -> loss -> none
-  results[r][c] = next;
-  results[c][r] = mirrorState(next); // the opposing cell always does the opposite, in the same click
+/* =========================================================================
+   STATE MUTATION (admin only — see isAdmin checks below)
+   ========================================================================= */
+function clearDownstream(matchId) {
+  for (const downstreamId of getDownstreamMatches(matchId)) {
+    if (downstreamId in winners && winners[downstreamId] !== null) {
+      winners[downstreamId] = null;
+      clearDownstream(downstreamId);
+    }
+  }
+}
+
+function handleSlotClick(matchId, playerName) {
+  if (!isAdmin) return; // belt-and-suspenders — these buttons are only ever wired up for admins anyway
+
+  if (winners[matchId] === playerName) {
+    winners[matchId] = null;
+    clearDownstream(matchId);
+  } else {
+    winners[matchId] = playerName;
+  }
   render();
   pushState();
 }
 
 /**
- * Sends the current results + blur state to Firebase. Only called from
+ * Sends the current winners + blur state to Firebase. Only called from
  * direct admin actions (a click, the toggle button) — never from the
  * subscribeState callback below, so an incoming remote update never
  * triggers a write right back out.
  */
 function pushState() {
-  writeState({ results, blurred: isBlurred, updatedAt: Date.now() }).catch((e) => {
-    console.error('Failed to save:', e);
-    alert(
-      "Couldn't save that change — your admin link may be wrong, expired, or you're offline. Try reloading this page with your correct ?key= link."
-    );
-  });
-}
-
-/* =========================================================================
-   GRID CONSTRUCTION (built once, on load)
-   An (N+1) x (N+1) CSS grid: a blank corner, a header row of names, a
-   header column of the same names, and an N x N block of cells in
-   between. Diagonal cells are plain non-interactive divs; everything
-   else is a real button.
-   ========================================================================= */
-function makeHeaderCell(label) {
-  const cell = document.createElement('div');
-  cell.className = 'rr-cell rr-header';
-  cell.textContent = label;
-  return cell;
-}
-
-function buildGrid() {
-  const grid = document.getElementById('rrGrid');
-  if (!grid) return;
-
-  grid.style.setProperty('--rr-size', String(N + 1));
-  grid.appendChild(makeHeaderCell('')); // blank top-left corner
-
-  PARTICIPANTS.forEach((name) => grid.appendChild(makeHeaderCell(name)));
-
-  for (let r = 0; r < N; r++) {
-    grid.appendChild(makeHeaderCell(PARTICIPANTS[r])); // row header
-
-    for (let c = 0; c < N; c++) {
-      if (r === c) {
-        const blank = document.createElement('div');
-        blank.className = 'rr-cell rr-diagonal';
-        blank.setAttribute('aria-hidden', 'true');
-        grid.appendChild(blank);
-        continue;
-      }
-
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'rr-cell rr-btn';
-      btn.dataset.cell = `${r}-${c}`;
-      btn.setAttribute('aria-label', `${PARTICIPANTS[r]} vs ${PARTICIPANTS[c]}`);
-      btn.addEventListener('click', () => handleCellClick(r, c));
-      grid.appendChild(btn);
+  writeState({ winners: { ...winners }, blurred: isBlurred, updatedAt: Date.now() }).catch(
+    (e) => {
+      console.error('Failed to save:', e);
+      alert(
+        "Couldn't save that change — your admin link may be wrong, expired, or you're offline. Try reloading this page with your correct ?key= link."
+      );
     }
-  }
+  );
 }
 
 /* =========================================================================
    RENDERING
    ========================================================================= */
 function render() {
-  for (let r = 0; r < N; r++) {
-    for (let c = 0; c < N; c++) {
-      if (r === c) continue;
+  renderMatch('qf1');
+  renderMatch('qf2');
+  renderMatch('qf3');
+  renderMatch('qf4');
+  renderMatch('sf1');
+  renderMatch('sf2');
+  renderFinal();
+  drawConnectors();
+}
 
-      const btn = document.querySelector(`[data-cell="${r}-${c}"]`);
-      if (!btn) continue;
+function renderMatch(matchId) {
+  const matchEl = document.querySelector(`[data-match="${matchId}"]`);
+  const players = getMatchPlayers(matchId);
+  const decidedWinner = winners[matchId];
 
-      const state = results[r][c];
-      btn.classList.remove('rr-win', 'rr-loss');
-      btn.textContent = '';
+  ['p1', 'p2'].forEach((slotKey) => {
+    const button = matchEl.querySelector(`[data-slot="${slotKey}"]`);
+    const playerName = players[slotKey];
+    const isKnown = playerName !== null;
 
-      if (state === 1) {
-        btn.classList.add('rr-win');
-        btn.textContent = 'W';
-      } else if (state === 2) {
-        btn.classList.add('rr-loss');
-        btn.textContent = 'L';
-      }
+    button.querySelector('.slot-label').textContent = isKnown ? playerName : 'TBD';
+    button.classList.remove('winner', 'loser');
 
-      // Viewers (no ?key=) see live colors but can never click; admins
-      // can always click, even on an already-decided cell, since a
-      // third click is what resets it.
-      btn.disabled = !isAdmin;
+    if (!isKnown) {
+      button.disabled = true;
+      return;
     }
-  }
+
+    if (!isAdmin) {
+      // Read-only visitor: reflect the current result, but nothing here
+      // is ever clickable.
+      button.disabled = true;
+      if (decidedWinner === playerName) button.classList.add('winner');
+      else if (decidedWinner !== null) button.classList.add('loser');
+      return;
+    }
+
+    if (decidedWinner === null) {
+      button.disabled = false;
+    } else if (decidedWinner === playerName) {
+      button.disabled = false;
+      button.classList.add('winner');
+    } else {
+      button.disabled = true;
+      button.classList.add('loser');
+    }
+
+    if (!button.dataset.wired) {
+      button.addEventListener('click', () => handleSlotClick(matchId, playerName));
+      button.dataset.wired = 'true';
+    }
+  });
+}
+
+function renderFinal() {
+  const matchEl = document.querySelector('[data-match="final"]');
+  const players = getMatchPlayers('final');
+
+  ['p1', 'p2'].forEach((slotKey) => {
+    const label = matchEl.querySelector(`[data-slot="${slotKey}"]`);
+    const playerName = players[slotKey];
+    label.textContent = playerName ?? 'TBD';
+    label.classList.toggle('decided', playerName !== null);
+  });
 }
 
 /* =========================================================================
-   REVEAL / HIDE CONTROL
-   Same on/off blur the single-elimination brackets use — the grid IS
-   the element that gets blurred here (there's no separate wrapper),
-   since every cell in it is something a spectator shouldn't see early.
+   CONNECTOR LINES (unchanged from the original — pure layout math)
    ========================================================================= */
-const rrGrid = document.getElementById('rrGrid');
+const CONNECTOR_GROUPS = [
+  { feederA: 'qf1', feederB: 'qf2', target: 'sf1' },
+  { feederA: 'qf3', feederB: 'qf4', target: 'sf2' },
+  { feederA: 'sf1', feederB: 'sf2', target: 'final' },
+];
+
+function drawConnectors() {
+  const container = document.getElementById('bracketTree');
+  const svg = document.getElementById('connectorSvg');
+  const containerRect = container.getBoundingClientRect();
+
+  svg.innerHTML = '';
+
+  const bottomCenter = (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - containerRect.left, y: r.bottom - containerRect.top };
+  };
+  const topCenter = (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - containerRect.left, y: r.top - containerRect.top };
+  };
+
+  CONNECTOR_GROUPS.forEach(({ feederA, feederB, target }) => {
+    const elA = document.querySelector(`[data-match="${feederA}"]`);
+    const elB = document.querySelector(`[data-match="${feederB}"]`);
+    const elTarget =
+      target === 'final'
+        ? document.querySelector('.final-ring')
+        : document.querySelector(`[data-match="${target}"]`);
+
+    const a = bottomCenter(elA);
+    const b = bottomCenter(elB);
+    const t = topCenter(elTarget);
+    const midY = a.y + (t.y - a.y) / 2;
+
+    const elbow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    elbow.setAttribute('d', `M ${a.x} ${a.y} L ${a.x} ${midY} L ${b.x} ${midY} L ${b.x} ${b.y}`);
+    svg.appendChild(elbow);
+
+    const drop = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    drop.setAttribute('d', `M ${t.x} ${midY} L ${t.x} ${t.y}`);
+    svg.appendChild(drop);
+  });
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(drawConnectors, 100);
+});
+
+/* =========================================================================
+   REVEAL / HIDE CONTROL
+   ========================================================================= */
+const bracketTree = document.getElementById('bracketTree');
 const toggleBtn = document.getElementById('bracketToggle');
 
-function setGridHidden(hidden) {
+function setBracketHidden(hidden) {
   isBlurred = hidden;
-  rrGrid.classList.toggle('blurred', hidden);
-  rrGrid.inert = hidden;
+  bracketTree.classList.toggle('blurred', hidden);
+  bracketTree.inert = hidden;
   toggleBtn.textContent = hidden ? 'Reveal Bracket' : 'Hide Bracket';
   toggleBtn.setAttribute('aria-pressed', String(!hidden));
 }
 
 toggleBtn.addEventListener('click', () => {
   if (!isAdmin) return;
-  setGridHidden(!rrGrid.classList.contains('blurred'));
+  setBracketHidden(!bracketTree.classList.contains('blurred'));
   pushState();
 });
 
 /* =========================================================================
    ADMIN BANNER
+   Small status line (markup in index.html) telling whoever's looking at
+   this page whether THEY can edit it.
    ========================================================================= */
 function updateAdminBanner() {
   const banner = document.getElementById('adminBanner');
@@ -192,22 +261,19 @@ function updateAdminBanner() {
    STARTUP
    ========================================================================= */
 async function init() {
-  buildGrid();
-
   isAdmin = await trySignInFromUrl();
   updateAdminBanner();
 
   // First call arrives immediately with whatever's already stored (or
-  // null); every call after that is a live update.
+  // null); every call after that is a live update — from THIS admin's
+  // own actions echoing back, or (in the unlikely event two people have
+  // the admin link) anyone else's.
   subscribeState((remote) => {
-    if (remote && Array.isArray(remote.results)) {
-      results = PARTICIPANTS.map((_, r) =>
-        PARTICIPANTS.map((_, c) => (remote.results[r] && remote.results[r][c] !== undefined ? remote.results[r][c] : 0))
-      );
-    } else {
-      results = emptyResults();
-    }
-    setGridHidden(remote && typeof remote.blurred === 'boolean' ? remote.blurred : true);
+    const remoteWinners = (remote && remote.winners) || {};
+    Object.keys(winners).forEach((key) => {
+      winners[key] = key in remoteWinners ? remoteWinners[key] : null;
+    });
+    setBracketHidden(remote && typeof remote.blurred === 'boolean' ? remote.blurred : true);
     render();
   });
 }

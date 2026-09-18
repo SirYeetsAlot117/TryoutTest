@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Esports Tryouts - Round Robin</title>
+  <title>Esports Tryouts - Round 4</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
@@ -13,15 +13,9 @@
 
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Page-specific styling for the round robin grid, kept local here
-       the same way admin2.html/admin3.html keep their admin-banner
-       colors local rather than adding them to styles.css. Reuses the
-       shared design tokens (--panel, --panel-border, --text, --blur-
-       amount, etc.) and adds one new local token, --rr-win, since
-       styles.css doesn't define a "win" color of its own (--accent-gold
-       means something different elsewhere — the champion/revealed
-       state — so a distinct green keeps this grid's win/loss reading
-       unambiguous at a glance). -->
+  <!-- Tiny bit of page-specific styling for the admin/view-only banner —
+       kept local here rather than added to styles.css since it's just
+       two color states. -->
   <style>
     .admin-banner {
       max-width: 1080px;
@@ -42,176 +36,174 @@
       background: var(--loser-bg);
       color: var(--loser);
     }
-
-    :root {
-      --rr-win: #3ea86b;
-      --rr-win-bg: rgba(62, 168, 107, 0.15);
-      /* EDIT HERE to change every grid cell's width (header cells and
-         match cells alike) — one variable so the grid's own box width
-         (columns * this) always matches what's used to center it. */
-      --rr-cell-width: 130px;
-    }
-
-    /* Same "keep the shape, scroll sideways instead of collapsing"
-       approach as .bracket-scroll in styles.css, including the extra
-       top padding: overflow-x: auto forces overflow-y to clip too, and
-       without this room the blurred grid's soft edge (filter: blur()
-       bleeds outward like a drop shadow) gets cut off flat instead of
-       fading out. */
-    .rr-scroll {
-      overflow-x: auto;
-      padding: calc(var(--blur-amount) * 2) 0 8px;
-    }
-
-    /* width: fit-content (rather than letting the grid stretch to fill
-       .rr-scroll, which is what repeat(N, 1fr) columns would do) is
-       what makes `margin: 0 auto` actually center the grid — a fixed-
-       width box centers inside a wider container; a box that's already
-       stretched to match its container's width has nothing to center
-       within. Same reasoning as .bracket-tree's fixed --match-width
-       columns in styles.css. */
-    .rr-grid {
-      display: grid;
-      grid-template-columns: repeat(var(--rr-size, 7), var(--rr-cell-width));
-      gap: 4px;
-      width: fit-content;
-      margin: 0 auto;
-      transition: filter 300ms ease;
-    }
-
-    /* Toggled by round4.js's reveal/hide button — identical mechanism
-       to .bracket-tree.blurred in styles.css, just scoped to this
-       page's grid element directly (there's no separate wrapper here). */
-    .rr-grid.blurred {
-      filter: blur(var(--blur-amount));
-      pointer-events: none;
-      user-select: none;
-    }
-
-    .rr-cell {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 10px 8px;
-      min-height: 48px;
-    }
-
-    .rr-header {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-weight: 700;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      line-height: 1.2;
-    }
-
-    .rr-diagonal {
-      background: var(--loser-bg);
-      border: 1px solid var(--panel-border);
-    }
-
-    .rr-btn {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-weight: 800;
-      font-size: 1rem;
-      color: var(--text-muted);
-      background: var(--panel);
-      border: 1px solid var(--panel-border);
-      cursor: pointer;
-      transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
-    }
-
-    .rr-btn:not(:disabled):hover {
-      border-color: var(--text);
-      color: var(--text);
-    }
-
-    .rr-btn:not(:disabled):active {
-      transform: scale(0.96);
-    }
-
-    .rr-btn:disabled {
-      cursor: not-allowed;
-    }
-
-    /* Clicked once. */
-    .rr-btn.rr-win {
-      background: var(--rr-win-bg);
-      border-color: var(--rr-win);
-      color: var(--rr-win);
-    }
-
-    /* Clicked twice. A third click on either state resets to the plain
-       .rr-btn look above. */
-    .rr-btn.rr-loss {
-      background: var(--loser-bg);
-      border-color: var(--accent-red);
-      color: var(--accent-red);
-    }
-
-    .rr-legend {
-      max-width: 1080px;
-      margin: 20px auto 0;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-    }
   </style>
 </head>
 <body>
+  <!-- Ambient background effect: a small pixel-grid fire simulation
+       (the classic "Doom fire" technique) drawn at low native resolution
+       and scaled up with image-rendering: pixelated, which is what gives
+       it the chunky/blocky look rather than a smooth gradient. Purely
+       decorative — aria-hidden, pointer-events: none in CSS, and sits at
+       a negative z-index so it never sits above or intercepts clicks on
+       any real content. See fire.js for the simulation and round1.css
+       for its positioning/pixelation rules. -->
   <canvas id="fireCanvas" aria-hidden="true"></canvas>
 
   <header class="tournament-header">
-    <h1><span class="divider">·</span> Round Robin Admin Control <span class="divider">·</span></h1>
+    <h1><span class="divider">·</span> Round 4 Admin Control <span class="divider">·</span></h1>
   </header>
 
   <hr class="section-divider" />
 
-  <!-- Filled in by round4.js on load: tells whoever opened this page
+  <!-- Filled in by round1.js on load: tells whoever opened this page
        whether THEY can edit it (i.e. whether this URL had a valid
        ?key=... admin token) or are just watching. -->
   <p id="adminBanner" class="admin-banner admin-no">Checking access…</p>
 
   <!--
-    The grid itself is built entirely in round4.js from
-    window.RR_PARTICIPANTS (bracketData4.js) — nothing is hardcoded here
-    beyond the empty container, so the grid always matches however many
-    names are in that list. Each non-diagonal button cycles: click once
-    for a win (green), twice for a loss (red), a third time to reset —
-    and the opposing button (row/column swapped) is set to the mirror
-    result in that same click, since one match can't have two winners.
+    Layout note: this is now a CSS grid tree, four columns wide, matching
+    the sketch — a top row of four match boxes, a middle row of two
+    semifinal boxes each centered under its feeder pair, and a bottom row
+    with the final box centered under everything. Each match box holds its
+    two player rows stacked on top of each other (instead of side by side
+    with a "vs"), again to match the sketch.
+
+    The bracket connector lines you see between rows aren't drawn here —
+    they're pure decoration computed in round1.js (drawConnectors), because
+    their endpoints depend on the actual on-screen position of each box,
+    which can shift with window size.
   -->
-  <div class="rr-scroll">
-    <div class="rr-grid" id="rrGrid"></div>
+  <div class="bracket-scroll">
+    <div class="bracket-tree" id="bracketTree">
+      <svg class="connectors" id="connectorSvg"></svg>
+
+      <!-- Every .slot button now holds two children instead of a bare
+           text node: a small SVG drawing the diagonal corner-accent line
+           (see round1.css's "THE CORNER FIX" for why it's an SVG line
+           rather than a CSS shape), and a .slot-label span that actually
+           holds the player's name. round1.js updates the label span's
+           text, never the button's own textContent, so it never wipes
+           out the SVG. p1 buttons (top row) get the plain line; p2
+           buttons (bottom row) reuse the exact same line coordinates
+           but with the "corner-svg--br" class, which just rotates the
+           whole SVG 180° so the line lands in the bottom-right corner
+           instead of hand-mirroring the coordinates. -->
+
+      <!-- ===================== QUARTERFINALS (row 1) ===================== -->
+      <div class="match" data-match="qf1" style="grid-column: 1; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Malik Jacques</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Hayden Casey</span>
+        </button>
+      </div>
+
+      <div class="match" data-match="qf2" style="grid-column: 2; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Landon D'Albenzio</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Abraham Louis</span>
+        </button>
+      </div>
+
+      <div class="match" data-match="qf3" style="grid-column: 3; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Emmanuel Montero</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Aleksei Bitkin</span>
+        </button>
+      </div>
+
+      <div class="match" data-match="qf4" style="grid-column: 4; grid-row: 1;">
+        <button class="slot" data-slot="p1">
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Nicolas Sieckowski</span>
+        </button>
+        <button class="slot" data-slot="p2">
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">Matheus Peruchi</span>
+        </button>
+      </div>
+
+
+      <!-- ===================== SEMIFINALS (row 2) ===================== -->
+      <div class="match match-sf" data-match="sf1" style="grid-column: 1 / span 2; grid-row: 2;">
+        <button class="slot" data-slot="p1" disabled>
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+        <button class="slot" data-slot="p2" disabled>
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+      </div>
+
+      <div class="match match-sf" data-match="sf2" style="grid-column: 3 / span 2; grid-row: 2;">
+        <button class="slot" data-slot="p1" disabled>
+          <svg class="corner-svg" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+        <button class="slot" data-slot="p2" disabled>
+          <svg class="corner-svg corner-svg--br" aria-hidden="true" focusable="false"><line class="corner-line" x1="14" y1="0" x2="0" y2="14" /></svg>
+          <span class="slot-label">TBD</span>
+        </button>
+      </div>
+
+      <!-- ===================== FINAL (row 3) ===================== -->
+      <!-- The oval outline from the sketch is the .final-ring wrapper.
+           Inside it, two plain <div> labels — never buttons — since this
+           bracket only produces two finalists, not a champion. -->
+      <div class="final-ring" style="grid-column: 1 / span 4; grid-row: 3;">
+        <div class="match final-match" data-match="final">
+          <div class="finalist" data-slot="p1">TBD</div>
+          <div class="finalist" data-slot="p2">TBD</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Same reveal/hide control as round1.html/2/3 (.bracket-controls
-       and .toggle-btn are already defined in styles.css — nothing extra
-       needed here). round4.js hides this entirely for non-admin (no
-       ?key=) visitors. -->
+  <!-- Toggled by round1.js: starts pointed at "revealed" text/aria state
+       here as a sane no-JS fallback, but the actual starting state
+       (hidden vs revealed) comes from Firebase. round1.js also hides
+       this button entirely for non-admin (no ?key=) visitors. -->
   <div class="bracket-controls">
     <button id="bracketToggle" class="toggle-btn" type="button" aria-pressed="false">
       Reveal Bracket
     </button>
   </div>
 
+  <h1> </h1>
   <hr class="section-divider" />
 
+  <!-- Not wired up to anything yet — no click handlers, no page to go
+       to. Purely a placeholder row for the other three brackets that
+       don't exist as pages yet, styled to match everything else on the
+       page. "Round 1" is marked as the current page (aria-current +
+       .is-current) since that's what this file actually is. -->
   <nav class="round-nav" aria-label="Tournament rounds">
     <button class="round-nav-btn" type="button" onclick="window.location.href='index.html'">Round 1 Admin Control</button>
     <button class="round-nav-btn" type="button" onclick="window.location.href='admin2.html'">Round 2 Admin Control</button>
     <button class="round-nav-btn" type="button" onclick="window.location.href='admin3.html'">Round 3 Admin Control</button>
     <button class="round-nav-btn is-current" type="button" aria-current="page">
-      Admin Control Round Robin
+      Round 4 Admin Control
     </button>
   </nav>
 
   <script src="fire.js"></script>
   <script src="bracketData4.js"></script>
-  <!-- type="module" — needed so round4.js can `import` Firebase and
-       firebase-sync4.js. Module scripts run after the document has been
-       parsed (like `defer`), so bracketData4.js above has already set
-       window.RR_PARTICIPANTS by the time this runs. -->
+  <!-- type="module" — needed so round3.js can `import` Firebase and
+       firebase-sync.js. Module scripts run after the document has been
+       parsed (like `defer`), so bracketData.js above has already set
+       window.QUARTERFINAL_PLAYERS/FEEDERS by the time this runs. -->
   <script type="module" src="round4.js"></script>
 </body>
 </html>
